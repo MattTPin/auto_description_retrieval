@@ -23,9 +23,6 @@ def main() -> None:
     scrape_parser = subparsers.add_parser("scrape_description", help="Fetch and process vehicle description.")
     scrape_parser.add_argument("vdp_url", type=str, help="The VDP URL to process.")\
 
-    # Run the "test" command
-    subparsers.add_parser("test", help="Verify functionality including API querying.")
-
     # Initalize the LLM client and ensure current config / connection work
     llm_client = LLMClient()
     llm_client.test_connection()
@@ -43,10 +40,6 @@ def main() -> None:
             print(f"- query complete using {token_count} tokens")
         
         return description
-    
-    elif args.command == "test":
-        print("IMPLEMENT TESTING")
-        # full_test()
 
 
 if __name__ == "__main__":
