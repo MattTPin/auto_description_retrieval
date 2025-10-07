@@ -1,6 +1,18 @@
 # Auto Description Retrieval
 
-This project retrieves and isolates vehicle descriptions from Vehicle Detail Pages (VDPs) using LLM-based text extraction.
+This project takes a URL containing a listing a vehicle (Vehicle Detail Page (VDPs)) and retrieves and isolates vehicle descriptions using HTML scraping and LLM-based text extraction.
+
+---
+
+## Supported Websites
+
+Currently, the project is configured to extract vehicle descriptions from the following websites:
+
+    - greghublerford.com
+    - sftoyota.com
+    - bergeronchryslerjeep.com
+
+Each site has predefined search paths in the code to locate vehicle descriptions.
 
 ---
 
@@ -9,6 +21,7 @@ This project retrieves and isolates vehicle descriptions from Vehicle Detail Pag
 This project can be run in several Dockerized contexts depending on your use case.
 
 ---
+
 
 ### **1. API Mode**
 
