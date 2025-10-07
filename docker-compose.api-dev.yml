@@ -1,0 +1,11 @@
+services:
+  auto_description_api_dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auto_description_api_dev
+    env_file: .env
+    ports:
+      - "8001:8001"
+    volumes:
+      - .:/app

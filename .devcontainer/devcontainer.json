@@ -1,0 +1,13 @@
+{
+    "name": "Auto Description Retrieval Dev VS Code",
+    "dockerComposeFile": "../docker-compose.api-dev.yml",
+    "service": "auto_description_api_dev",
+    "workspaceFolder": "/app",
+    "forwardPorts": [8001],
+    "remoteUser": "root",
+    "customizations": {
+        "vscode": {
+            "extensions": ["ms-python.python", "ms-azurWetools.vscode-docker"]
+        }
+    }
+}

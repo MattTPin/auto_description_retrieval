@@ -1,0 +1,13 @@
+services:
+  auto_description_cli:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auto_description_cli
+    env_file: .env
+    environment:
+      - MODE=cli
+    volumes:
+      - .:/app
+    tty: true
+    entrypoint: /app/entrypoint.sh

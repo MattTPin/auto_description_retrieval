@@ -1,0 +1,216 @@
+# Auto Description Retrieval
+
+This project retrieves and isolates vehicle descriptions from Vehicle Detail Pages (VDPs) using LLM-based text extraction.
+
+---
+
+## Run Modes
+
+This project can be run in several Dockerized contexts depending on your use case.
+
+---
+
+### **1. API Mode**
+
+Launches a FastAPI server inside Docker.  
+The API will be available at:
+
+- **Base URL:** [http://localhost:8000/](http://localhost:8000/)
+- **Interactive Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+**Command:**
+```bash
+docker compose -f docker-compose.api.yml up --build
+```
+
+This will build the image (if needed), launch the API container, and start the web server automatically.
+
+---
+
+### **2. CLI Mode**
+
+Run commands inside an ephemeral (temporary) container that will delete itself after the job is complete — perfect for quick testing or batch jobs.
+
+#### Using Makefile (recommended)
+
+```bash
+# Run a scrape_description command with a URL
+make scrape_description URL=<VDP_URL>
+```
+
+#### Full equivalent Docker command
+
+```bash
+docker compose -f docker-compose.cli.yml run --rm auto_description_cli scrape_description <VDP_URL>
+```
+
+#### Rebuild CLI image manually (only needed if dependencies change)
+```bash
+docker compose -f docker-compose.cli.yml build --no-cache
+```
+
+---
+
+### **3. Dev Container (VS Code) Mode**
+
+Used for developing and debugging directly inside Docker through VS Code.  
+Relies on `devcontainer.json` and `docker-compose.api-dev.yml`.
+
+- **Launch API:**  
+  ```bash
+  docker compose -f docker-compose.api-dev.yml up
+  ```
+
+- **Base URL:** [http://localhost:8001/](http://localhost:8001/)
+- **Swagger UI:** [http://localhost:8001/docs](http://localhost:8001/docs)
+
+Alternatively, you can open the repo in VS Code → “Reopen in Container” and run `main.py` or `uvicorn` directly inside the dev environment.
+
+You will likely want to setup a virtual enviornment and install all packages in requirements.txt...
+
+- 1. Create a venv
+    ```bash
+    python -m venv venv
+    ```
+- 2. activate the venv
+    ```bash
+    source venv/bin/activate
+    ```
+- 3. install requirements.txt
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+---
+
+## Actions
+
+| Action | Description |
+|--------|--------------|
+| `scrape_description` | _(Retrieve the HTML at the provided page and extract the Vehicle Description Paragrah)_ |
+
+Example usage:
+
+### <u>CLI</u>
+- With Makefile
+    ```bash
+    make scrape_description URL=https://www.greghublerford.com/inventory/used-2010-subaru-outback-3-6r-awd-4d-sport-utility-4s4brejc2a2319275/
+    ```
+OR
+- With docker compose
+    ```bash
+    docker compose -f docker-compose.cli.yml run --rm auto_description_cli scrape_description https://www.greghublerford.com/inventory/used-2010-subaru-outback-3-6r-awd-4d-sport-utility-4s4brejc2a2319275/
+    ```
+
+### <u>API</u>
+- **Endpoint:**  
+`POST /scrape_description`
+
+- **Example cURL request:**
+    ```bash
+    curl -X POST http://localhost:8000/scrape_description \
+        -H "Content-Type: application/json" \
+        -d '{
+            "vdp_url": "https://www.greghublerford.com/inventory/used-2010-subaru-outback-3-6r-awd-4d-sport-utility-4s4brejc2a2319275/"
+            }'
+    ```
+
+- **Expected JSON response:**
+    ```json
+    {
+    "description": "Take on any road with confidence in this 2010 Subaru Outback 3.6R AWD, a versatile crossover SUV known for its legendary all-wheel-drive capability and dependability.",
+    "token_count": 108
+    }
+    ```
+
+
+### <u>Python Direct</u>
+```bash
+python main.py scrape_description https://www.greghublerford.com/inventory/used-2010-subaru-outback-3-6r-awd-4d-sport-utility-4s4brejc2a2319275/
+```
+
+---
+
+## LLM Configuration
+
+This project uses **LangChain** as a universal interface for interacting with multiple Large Language Model (LLM) APIs.  
+You can dynamically switch between **Anthropic (Claude)**, **OpenAI (GPT)**, and **Mistral** models simply by updating the `.env` configuration.
+
+---
+
+### **Supported Providers**
+
+| Provider | Example Model | Description |
+|-----------|----------------|-------------|
+| `anthropic` | `claude-sonnet-4-5-20250929` | High-quality reasoning and long-context model from Anthropic (Claude family). |
+| `openai` | `gpt-4o-mini` | Lightweight OpenAI GPT-4 variant with strong JSON handling and reasoning. |
+| `mistral` | `mistral-large-latest` | Open-weight large language model with strong general performance. |
+
+---
+
+### **Selecting a Provider**
+
+Set your preferred provider in the `.env` file:
+
+```bash
+# Choose which company's API to utilize
+# One of: "anthropic", "openai", "mistral"
+LLM_PROVIDER=anthropic
+```
+
+The system will automatically route requests through the corresponding LangChain wrapper.
+
+---
+
+### **Provider API Credentials**
+
+Each provider requires its own API key and model ID.  
+Add these values to your `.env` file (examples below):
+
+```bash
+# Anthropic (Claude)
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+ANTHROPIC_MODEL_ID=claude-sonnet-4-5-20250929
+
+# OpenAI (GPT)
+OPENAI_API_KEY=sk-proj-xxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENAI_MODEL_ID=gpt-4o-mini
+
+# Mistral
+MISTRAL_API_KEY=<REPLACE_ME>
+MISTRAL_MODEL_ID=mistral-large-latest
+```
+
+> Use a local `.env` file (ignored by `.gitignore`) or a secure secret manager.
+
+---
+
+### **Additional Configuration**
+
+```bash
+# API Mode Config
+API_FORCE_INSTALL=true     # Force reinstall dependencies on container start
+API_AUTO_START=true        # Automatically start FastAPI server when container launches
+
+# Logging / Debug Options
+PRINT_TOKEN_COUNT=true     # Display token usage for each LLM request
+```
+
+---
+
+### **Architecture Overview**
+
+The project uses the following stack for LLM integration:
+
+```
+LangChain
+   └── LLMClient (custom wrapper)
+         ├── AnthropicChatModel
+         ├── OpenAIChatModel
+         └── MistralChatModel
+```
+
+Each model is initialized dynamically at runtime based on your `.env` configuration.  
+This enables seamless switching between providers without changing application code.
+
+---

@@ -1,0 +1,12 @@
+services:
+  auto_description_api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: auto_description_api
+    env_file: .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    command: uvicorn api.server:app --host 0.0.0.0 --port 8000 --reload
