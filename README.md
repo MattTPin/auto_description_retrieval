@@ -214,3 +214,21 @@ Each model is initialized dynamically at runtime based on your `.env` configurat
 This enables seamless switching between providers without changing application code.
 
 ---
+
+This project uses **pytest** as the testing framework.
+
+## Running All Tests
+
+To run all tests, simply navigate to the project root and execute:
+
+```bash
+pytest tests/
+```
+
+Some tests involve LLM clients (Anthropic, OpenAI, Mistral).
+
+- If an API key for a specific LLM provider is not set in your environment variables, tests for that provider will be skipped automatically.
+
+- This allows tests to run for other components without requiring access to all LLM services.
+
+---

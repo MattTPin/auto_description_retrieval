@@ -1,3 +1,8 @@
+"""
+Function to retrieve scrape HTML of a VDP page and then isolate the vehicle description using an
+LLM query.
+"""
+
 from typing import Tuple
 from client.llm_client import LLMClient
 from core.helper_functions.fetch_vdp_html import fetch_vdp_html, determine_vdp_search_path

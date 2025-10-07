@@ -18,7 +18,6 @@ from langchain.schema import AIMessage, SystemMessage, HumanMessage
 
 from core.errors import (
     ConfigError,
-    LLMError,
     LLMInitializationError,
     LLMQueryError,
     LLMEmptyResponse
