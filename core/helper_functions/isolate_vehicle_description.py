@@ -3,7 +3,6 @@ Functions to trim a full description including dealership and features down to o
 """
 
 from client.llm_client import LLMClient
-
 from typing import Optional, Tuple
 
 def isolate_vehicle_description(
@@ -16,7 +15,7 @@ def isolate_vehicle_description(
     from a dealership's full listing (dealer information, feature breakdown, etc.).
 
     Args:
-        prompt (str): The input text to analyze and summarize.
+        prompt (str): The FULL dealership text to analyze and summarize.
         llm_client (Optional[LLMClient]): A pre-initialized LLMClient instance to query with.
         test_mode (bool): Whether to use mock/test responses instead of a real LLM call.
 
@@ -31,7 +30,7 @@ def isolate_vehicle_description(
     """
     # If existing LLM client not provided then initiate a connection to one
     function_name = "isolate_vehicle_description"
-    fallback_message = "No description found"
+    fallback_message = "No description found."
 
     # If an existing client is provided, create a copy with overrides for this funciton
     if llm_client:
@@ -49,24 +48,26 @@ def isolate_vehicle_description(
         )
         llm_client.test_connection()
 
+    # Description extraction prompt
     system_prompt: str = (
         "You are a vehicle description isolation assistant. "
         "You will receive text copied from a dealership listing containing dealer info, features, etc. "
-        "Your task is to extract only the vehicle's descriptive text verbatim — no summaries or added text. "
-        "The description may be one paragraph but or may be spread out throughout the full text body. "
+        "Your will extract only the vehicle's descriptive text verbatim — no summaries or added text. "
+        "The description may appear in one or multiple paragraphs, including in natural-language sections like reviews. "
         "You may include multiple descriptive paragraphs. "
-        "You may extract descriptions from sources like 'reviews' if presented in natural language."
-        "Respond ONLY with your contex a valid JSON in this exact format...:\n"
+        "Respond ONLY with your context a valid JSON in this exact format...:\n"
         """
         {"description" (str): "VEHICLE MODEL DESCRIPTION"}
         """
+        "IMPORTANT: If the description contains quotation marks (\") or single quotes ('), "
+        "escape double quotes with a backslash (\\\") so the JSON remains valid. "
         "If no description can be found, return the json set `description` to : `" + fallback_message + "`"
     )
     
     result, token_count = llm_client.query(
         system_prompt=system_prompt,
         user_prompt=prompt,
-        temperature=0.0,
+        temperature=0.0, # Minimal temperature to minimize randomness
         expect_json=True,
     )
     
