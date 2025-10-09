@@ -1,10 +1,18 @@
+name: auto_description_api
+
 services:
   auto_description_api_dev:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        MODE: api
     container_name: auto_description_api_dev
+    image: auto_description_api_image
     env_file: .env
+    environment:
+      - MODE=api
+      - API_AUTO_START=false
     ports:
       - "8001:8001"
     volumes:

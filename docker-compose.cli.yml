@@ -1,12 +1,19 @@
+name: auto_description_cli
+
 services:
   auto_description_cli:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        MODE: cli
     container_name: auto_description_cli
+    image: auto_description_cli_image
     env_file: .env
     environment:
       - MODE=cli
+      - API_AUTO_START=false
+      - PRINT_DEBUG_COMMENTS=false
     volumes:
       - .:/app
     tty: true
