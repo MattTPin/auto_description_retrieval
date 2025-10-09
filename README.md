@@ -78,22 +78,6 @@ Relies on `devcontainer.json` and `docker-compose.api-dev.yml`.
 - **Swagger UI:** [http://localhost:8001/docs](http://localhost:8001/docs)
 
 Alternatively, you can open the repo in VS Code → “Reopen in Container” and run `main.py` or `uvicorn` directly inside the dev environment.
-
-You will likely want to setup a virtual enviornment and install all packages in requirements.txt...
-
-- 1. Create a venv
-    ```bash
-    python -m venv venv
-    ```
-- 2. activate the venv
-    ```bash
-    source venv/bin/activate
-    ```
-- 3. install requirements.txt
-    ```bash
-    pip install -r requirements.txt
-    ```
-
 ---
 
 ## Actions
@@ -101,6 +85,7 @@ You will likely want to setup a virtual enviornment and install all packages in 
 | Action | Description |
 |--------|--------------|
 | `scrape_description` | _(Retrieve the HTML at the provided page and extract the Vehicle Description Paragrah)_ |
+| `determine_vpd_search_paths` | _(Retrieve the HTML at the provided page and attempt to determine the tags, class names, etc. that contain the dealer description)_ |
 
 Example usage:
 
@@ -131,8 +116,8 @@ OR
 - **Expected JSON response:**
     ```json
     {
-    "description": "Take on any road with confidence in this 2010 Subaru Outback 3.6R AWD, a versatile crossover SUV known for its legendary all-wheel-drive capability and dependability.",
-    "token_count": 108
+        "description": "Take on any road with confidence in this 2010 Subaru Outback 3.6R AWD, a versatile crossover SUV known for its legendary all-wheel-drive capability and dependability.",
+        "token_count": 108
     }
     ```
 
@@ -153,17 +138,17 @@ You can dynamically switch between **Anthropic (Claude)**, **OpenAI (GPT)**, and
 
 ### **Supported Providers**
 
-| Provider | Example Model | Description |
+| Provider | Example Model |
 |-----------|----------------|-------------|
-| `anthropic` | `claude-sonnet-4-5-20250929` | High-quality reasoning and long-context model from Anthropic (Claude family). |
-| `openai` | `gpt-4o-mini` | Lightweight OpenAI GPT-4 variant with strong JSON handling and reasoning. |
-| `mistral` | `mistral-large-latest` | Open-weight large language model with strong general performance. |
+| `anthropic` | `claude-sonnet-4-5-20250929` |
+| `openai` | `gpt-4o-mini` |
+| `mistral` | `mistral-large-latest` |
 
 ---
 
 ### **Selecting a Provider**
 
-Set your preferred provider in the `.env` file:
+Set your preferred provider and model in the `.env` file:
 
 ```bash
 # Choose which company's API to utilize
@@ -201,13 +186,9 @@ MISTRAL_MODEL_ID=mistral-large-latest
 ### **Additional Configuration**
 
 ```bash
-# API Mode Config
-API_FORCE_INSTALL=true     # Force reinstall dependencies on container start
-API_AUTO_START=true        # Automatically start FastAPI server when container launches
-
-# Logging / Debug Options
-PRINT_TOKEN_COUNT=true     # Display token usage for each LLM request
+PRINT_DEBUG_COMMENTS=true 
 ```
+> Displays various debug comments when functions are run.
 
 ---
 
