@@ -14,7 +14,7 @@ expected_test_responses = {
                 "the Outback offers comfort, utility, and Subaru reliability."
             )
         },
-        "failed": {"description": "No description found"},
+        "failed": {"description": "No description found."},
         "unexpected_json": {"vehicle_info": "It's a great car!"},
         "not_json": "It's an OK car!"
     }
