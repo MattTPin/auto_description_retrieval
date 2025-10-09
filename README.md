@@ -86,6 +86,7 @@ Alternatively, you can open the repo in VS Code → “Reopen in Container” an
 |--------|--------------|
 | `scrape_description` | _(Retrieve the HTML at the provided page and extract the Vehicle Description Paragrah)_ |
 | `determine_vpd_search_paths` | _(Retrieve the HTML at the provided page and attempt to determine the tags, class names, etc. that contain the dealer description)_ |
+| `demo_scrape_description` | _(Run multiple `scrape_description` queries in a row from urls in `tests/demo_urls.json` with full debug output)_ |
 
 Example usage:
 
@@ -192,26 +193,9 @@ PRINT_DEBUG_COMMENTS=true
 
 ---
 
-### **Architecture Overview**
-
-The project uses the following stack for LLM integration:
-
-```
-LangChain
-   └── LLMClient (custom wrapper)
-         ├── AnthropicChatModel
-         ├── OpenAIChatModel
-         └── MistralChatModel
-```
-
-Each model is initialized dynamically at runtime based on your `.env` configuration.  
-This enables seamless switching between providers without changing application code.
-
----
-
-This project uses **pytest** as the testing framework.
-
 ## Running All Tests
+
+This project uses **pytest** as the testing framework. The testing pathing is configured in `pytest.ini`
 
 To run all tests, simply navigate to the project root and execute:
 
