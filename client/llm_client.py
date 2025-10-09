@@ -7,6 +7,7 @@ Includes configuration validation, flexible prompting, and optional JSON parsing
 """
 import json
 import os
+import re
 import tiktoken
 from typing import Optional, Any, Dict, Literal
 import warnings
@@ -31,7 +32,41 @@ load_dotenv()
 
 class LLMClient:
     """
-    A flexible LLM client supporting multiple providers via LangChain.
+    A flexible, provider-agnostic client for interacting with large language models (LLMs)
+    through the LangChain interface.
+
+    This class handles initialization, configuration, and querying of multiple LLM providers
+    such as Anthropic, OpenAI, and Mistral. It resolves API keys and model IDs from environment
+    variables, validates provider settings, and standardizes response handling, token counting,
+    and JSON parsing across providers.
+
+    The client can also operate in a test mode that simulates responses for deterministic
+    testing without making live API calls.
+
+    Attributes:
+        provider (Optional[str]): Name of the LLM provider (e.g., "openai", "anthropic").
+        model (Optional[str]): Model identifier or name.
+        api_key (Optional[str]): Provider-specific API key used for authentication.
+        function_name (Optional[str]): Name of the function or feature invoking the LLM.
+        fallback_message (Optional[str]): Default message returned when the model response is empty.
+        test_mode (bool): If True, returns mock responses instead of making real API calls.
+        test_response_type (str): Mock response type used in test mode.
+        client (Any): Initialized LangChain chat model client.
+    
+    Raises:
+        ConfigError: If required environment variables are missing or invalid.
+        LLMInitializationError: If the model client cannot be initialized.
+        LLMQueryError: If a query fails during execution.
+
+    Example:
+        >>> client = LLMClient(provider="openai", model="gpt-4o-mini")
+        >>> response, tokens = client.query(
+        ...     system_prompt="You are a helpful assistant.",
+        ...     user_prompt="Summarize this paragraph.",
+        ...     expect_json=False
+        ... )
+        >>> print(response)
+        'Here’s a concise summary of the paragraph...'
     """
     def __init__(
         self,
@@ -42,7 +77,9 @@ class LLMClient:
         test_mode: Optional[bool] = False,
         test_response_type: Literal["success", "failed", "unexpected_json", "not_json"] = "success",
     ) -> None:
-        """Initialize the client and resolve provider-specific configuration."""
+        """
+        Initialize the client and resolve provider-specific configuration.
+        """
         # General variablews
         self.function_name = function_name
         self.fallback_message = fallback_message
@@ -96,6 +133,7 @@ class LLMClient:
 
         # Confirm that we can initiate the model
         try:
+            # Authenticate valid provider and API key
             self.client = init_chat_model(
                 model=self.model,
                 api_key=self.api_key,
@@ -107,15 +145,6 @@ class LLMClient:
                 model=self.model,
                 original_exception=e
             )
-
-    def _default_model_for_provider(self) -> str:
-        """Provide a fallback model per provider."""
-        defaults = {
-            "anthropic": "claude-3-sonnet-20240229",
-            "openai": "gpt-4o-mini",
-            "mistral": "mistral-small-latest",
-        }
-        return defaults.get(self.provider, "")
     
     def clone_with_overrides(
         self,
@@ -139,67 +168,7 @@ class LLMClient:
             test_response_type=test_response_type if test_response_type is not None else self.test_response_type,
         )
 
-    # --- CONFIG VALIDATION HELPERS ---
-
-    def _test_anthropic_config(self) -> bool:
-        """Validate Anthropic connection."""
-        return self._test_connection_generic("Anthropic")
-
-    def _test_openai_config(self) -> bool:
-        """Validate OpenAI connection."""
-        return self._test_connection_generic("OpenAI")
-
-    def _test_mistral_config(self) -> bool:
-        """Validate Mistral connection."""
-        return self._test_connection_generic("Mistral")
-
-    def _test_connection_generic(self, provider_name: str) -> bool:
-        """Generic connection test used by all providers."""
-        if not self.client:
-            raise LLMInitializationError(
-                provider=provider_name,
-                model=self.model,
-                original_exception="No client initialized"
-            )
-        try:
-            response = self.client.invoke("ping")
-            if response and hasattr(response, "content"):
-                return True
-        except Exception as e:
-            additional_message = ""
-            if "insufficient_quota" in str(e).lower():
-                additional_message += f"Out of tokens for `{provider_name}`"
-            if "rate limit" in str(e).lower():
-                additional_message += f"Rate limit reached for `{provider_name}`"
-            raise LLMInitializationError(
-                provider=provider_name,
-                model=self.model,
-                original_exception=e,
-                additional_message=additional_message
-            )
-        return False
-
-    def test_connection(self) -> bool:
-        """
-        Run provider-specific connection validation.
-        Returns True if successful, False otherwise.
-        """
-        if self.provider == "anthropic":
-            return self._test_anthropic_config()
-        elif self.provider == "openai":
-            return self._test_openai_config()
-        elif self.provider == "mistral":
-            return self._test_mistral_config()
-    
-        raise LLMInitializationError(
-            provider=self.provider,
-            model=self.model,
-            original_exception="No valid provider selected"
-        )
-    
-
     # --- QUERY EXECUTION ---
-
     def query(
         self,
         system_prompt: Optional[str],
@@ -267,32 +236,21 @@ class LLMClient:
             token_count = self._get_token_usage(response)
             
             # Get the result text
-            result_text = response.content.strip()
+            response_content = response.content.strip()
+            
             if expect_json:
                 try:
-                    # Normalize escaped quotes
-                    safe_text = result_text.replace('\\"', '"').strip()
-
-                    # Remove Markdown JSON fences like ```json ... ``` or ```
-                    if safe_text.startswith("```"):
-                        # Remove leading and trailing code fences safely
-                        safe_text = safe_text.strip("`")
-                        # Remove possible language tag (like 'json')
-                        safe_text = safe_text.replace("json\n", "", 1).replace("json\r\n", "", 1)
-                        # Remove any trailing triple backticks
-                        safe_text = safe_text.strip("`").strip()
-
-                    # Attempt to parse cleaned JSON
-                    result_text = json.loads(safe_text)
+                    # Try to parse the json
+                    response_content = self._clean_llm_json_response(response_text=response_content)
                 except Exception as e:
                     # Warn the user if we're expecting a json response but didn't get one (LLM faliure)
                     warnings.warn(
                         (
-                            f"LLM did not return valid JSON when it was expected to.\n"
-                            f"Exception: `{e}`\n"
-                            f"Provider: {self.provider}\n"
-                            f"Model: {self.model}\n"
-                            f"Function: {self.function_name}\n"
+                            f"LLM did not return valid JSON when it was expected to. "
+                            f"Provider: `{self.provider}` "
+                            f"Model: `{self.model}` "
+                            f"Function: `{self.function_name}` \n"
+                            f"Exception: `{e}` \n"
                             "This may occur if the LLM output was malformed or test mode variables "
                             "were not correctly defined."
                         ),
@@ -300,18 +258,84 @@ class LLMClient:
                     )
             
             # Return fallback message if result text is empty
-            if not result_text:
-                result_text = self.fallback_message or "No query result"
+            if not response_content:
+                response_content = self.fallback_message or "No query result"
 
-            return result_text, token_count
+            return response_content, token_count
 
         except Exception as e:
             raise LLMQueryError(provider=self.provider, model=self.model, original_exception=e)
     
     
+    def _clean_llm_json_response(self, response_text: str):
+        """
+        Normalize and parse a JSON string returned by an LLM into a valid Python object.
+
+        This method is designed to handle the common formatting issues that occur when
+        large language models (LLMs) return JSON-like data wrapped in Markdown code fences,
+        extra whitespace, or stray characters. It attempts to safely extract and load the
+        actual JSON structure so it can be programmatically processed.
+
+        The function performs the following steps:
+        1. Removes leading and trailing whitespace.
+        2. Strips Markdown-style code fences such as ```json ... ``` or ``` ... ```.
+        3. Attempts to directly parse the cleaned string as JSON.
+        4. If direct parsing fails, uses a regex search to extract the first valid JSON
+            object (`{...}`) or array (`[...]`) from the text and parses that.
+        5. Raises a `json.JSONDecodeError` if no valid JSON structure can be found.
+
+        Args:
+            response_text (str): The raw text response from an LLM that is expected to
+                                contain valid JSON data, possibly wrapped in Markdown
+                                formatting or other text artifacts.
+
+        Returns:
+            Any: The parsed Python object (typically a `dict` or `list`) resulting from
+                successful JSON decoding.
+
+        Raises:
+            json.JSONDecodeError: If no valid JSON structure can be extracted or parsed
+                                from the provided text.
+        """
+        # Strip leading/trailing whitespace
+        text = response_text.strip()
+
+        # Remove any code fences like ```json ... ```
+        # Matches ```json ... ``` or ``` ... ``` anywhere in the string
+        text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
+        text = re.sub(r"\n?```$", "", text)
+        
+        # Sometimes the model returns JSON arrays or objects as strings; try to parse
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            # If it still fails, try to extract the JSON content by searching for '{}' or '[]'
+            match = re.search(r"(\{.*\}|\[.*\])", text, re.DOTALL)
+            if match:
+                return json.loads(match.group(1))
+            raise  # rethrow if no valid JSON structure was found
+    
+    
     def _get_token_usage(self, response: Any) -> int:
         """
         Retrieve or estimate the total number of tokens used in a model response.
+
+        This method attempts to determine how many tokens were consumed during
+        a language model call by checking various possible metadata formats used
+        by different LLM providers (e.g., OpenAI, Anthropic, Mistral). 
+
+        The function checks several potential locations in the response object
+        where token usage may be stored, falling back to estimating the token
+        count from the response text if explicit metadata is unavailable.
+
+        Args:
+            response: The response object returned by a model invocation. 
+                    This may be a LangChain `LLMResult`, an SDK-specific
+                    response object, or a dictionary-like structure.
+
+        Returns:
+            int: The total number of tokens used for both input and output,
+                or an estimated count if metadata is unavailable.
         """
         # Direct usage attribute
         if hasattr(response, "usage") and isinstance(response.usage, dict):
@@ -349,3 +373,70 @@ class LLMClient:
             return len(encoding.encode(text))
         except Exception:
             return len(text.split())
+    
+    
+    # --- TESTING ---
+    def test_connection(self) -> bool:
+        """
+        Run provider-specific connection validation.
+        Returns True if successful, False otherwise.
+        
+        Checks for..
+            - Invalid or expired API key
+            - Model quota exceeded
+            - Rate limit errors
+            - Missing client initialization
+        
+        Returns:
+            bool: Whether connection is valid or not
+        """
+        if self.provider == "anthropic":
+            return self._test_anthropic_config()
+        elif self.provider == "openai":
+            return self._test_openai_config()
+        elif self.provider == "mistral":
+            return self._test_mistral_config()
+    
+        raise LLMInitializationError(
+            provider=self.provider,
+            model=self.model,
+            original_exception="No valid provider selected"
+        )
+    
+    def _test_anthropic_config(self) -> bool:
+        """Validate Anthropic connection."""
+        return self._test_connection_generic("Anthropic")
+
+    def _test_openai_config(self) -> bool:
+        """Validate OpenAI connection."""
+        return self._test_connection_generic("OpenAI")
+
+    def _test_mistral_config(self) -> bool:
+        """Validate Mistral connection."""
+        return self._test_connection_generic("Mistral")
+
+    def _test_connection_generic(self, provider_name: str) -> bool:
+        """Generic connection test used by all providers."""
+        if not self.client:
+            raise LLMInitializationError(
+                provider=provider_name,
+                model=self.model,
+                original_exception="No client initialized"
+            )
+        try:
+            response = self.client.invoke("ping")
+            if response and hasattr(response, "content"):
+                return True
+        except Exception as e:
+            additional_message = ""
+            if "insufficient_quota" in str(e).lower():
+                additional_message += f"Out of tokens for `{provider_name}`"
+            if "rate limit" in str(e).lower():
+                additional_message += f"Rate limit reached for `{provider_name}`"
+            raise LLMInitializationError(
+                provider=provider_name,
+                model=self.model,
+                original_exception=e,
+                additional_message=additional_message
+            )
+        return False
