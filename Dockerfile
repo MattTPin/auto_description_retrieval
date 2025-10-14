@@ -9,6 +9,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# Set default "MODE" arg. Easily overwritten in specific docker-compose.yml instance
+ARG MODE=api
+
 # ---- System deps needed for some wheels (keep minimal) ----
 # ---- Includes minimal system deps for headless Chromium ----
 # If you need deps for specific packages are needed then add them here.
@@ -18,11 +21,16 @@ RUN apt-get update \
 
 # ---- Copy only requirements first to leverage Docker layer cache ----
 COPY requirements.txt .
+COPY requirements-api.txt .
 
 # Install dependencies at image build time (makes CLI fast).
 # If requirements change, this layer will rebuild.
-RUN pip install --upgrade pip \
-    && pip install -r requirements.txt
+RUN pip install --root-user-action=ignore -r requirements.txt
+
+# Conditionally install API dependency packages if MODE is "api"
+RUN if [ "$MODE" = "api" ]; then \
+      pip install --root-user-action=ignore -r requirements-api.txt; \
+    fi
 
 # ---- Copy application files ----
 COPY . .

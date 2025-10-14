@@ -23,19 +23,19 @@ def create_mock_llm_client(response_type="success") -> LLMClient:
     client.test_mode = True
     client.function_name = "isolate_vehicle_description"
     client.test_response_type = response_type
-    client.fallback_message = "No description found"
+    client.fallback_message = "No description found."
 
     # Mock the __call__ or send_message used by isolate_vehicle_description
     if response_type == "success":
         content = '{"description": "Take on any road with confidence"}'
     elif response_type == "failed":
-        content = '{"description": "No description found"}'
+        content = '{"description": "No description found."}'
     elif response_type == "unexpected_json":
         content = '{"vehicle_info": "Some raw info"}'  # missing "description"
     elif response_type == "not_json":
         content = "Plain text, not JSON"
     else:
-        content = '{"description": "No description found"}'
+        content = '{"description": "No description found."}'
 
     mock_response = {
         "content": content,
@@ -85,7 +85,7 @@ def test_isolate_vehicle_description_unexpected_json():
     assert isinstance(token_count, int)
     assert "description" in result
     # Since description is missing in JSON, fallback should be used
-    assert result["description"] == "No description found"
+    assert result["description"] == "No description found."
     # Original keys may still exist
     assert "vehicle_info" in result
 
